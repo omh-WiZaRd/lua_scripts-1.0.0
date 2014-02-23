@@ -1,4 +1,4 @@
--- Virus Finder 0.5
+-- Virus Finder 0.6
 -- © 2013-2014 RoLex
 -- Based on script from http://dchublist.ru/forum/viewtopic.php?f=6&t=1010
 
@@ -36,7 +36,9 @@ conf = {
 		"pthc",
 		"preteen",
 		"lolita",
-		"sex"
+		"sex",
+		".jpg",
+		".mp3"
 	},
 
 	["exts"] = {												-- list of file extensions to search for
@@ -216,6 +218,19 @@ function getname (name, file)
 	local lame = name:lower ()
 
 	for part in file:gmatch ("[^ ]+") do
+		part = part:gsub ("%%", "%%%%")
+		part = part:gsub ("%^", "%%^")
+		part = part:gsub ("%$", "%%$")
+		part = part:gsub ("%(", "%%(")
+		part = part:gsub ("%)", "%%)")
+		part = part:gsub ("%.", "%%.")
+		part = part:gsub ("%[", "%%[")
+		part = part:gsub ("%]", "%%]")
+		part = part:gsub ("%*", "%%*")
+		part = part:gsub ("%+", "%%+")
+		part = part:gsub ("%-", "%%-")
+		part = part:gsub ("%?", "%%?")
+
 		if not lame:find (part) then
 			return false
 		end
