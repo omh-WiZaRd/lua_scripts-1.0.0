@@ -89,6 +89,8 @@ function VH_OnTimer (msec)
 			end
 		end
 
+		--[[
+
 		local ok, list = VH:GetNickList ()
 
 		if ok and list and # list >= 11 then
@@ -115,6 +117,10 @@ function VH_OnTimer (msec)
 		else
 			VH:SendToClass ("$Search Hub:" .. sets.from .. " F?F?0?1?" .. sets.find [sets.next] .. "|", 0, conf.skip - 1)
 		end
+
+		]]--
+
+		VH:SendToClass ("$Search Hub:" .. sets.from .. " F?F?0?1?" .. sets.find [sets.next] .. "|", 0, conf.skip - 1)
 
 		if sets.next == # sets.find then
 			sets.next = 1
