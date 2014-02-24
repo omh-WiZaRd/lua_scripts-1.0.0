@@ -1,4 +1,4 @@
--- Virus Finder 0.6
+-- Virus Finder 0.7
 -- © 2013-2014 RoLex
 -- Based on script from http://dchublist.ru/forum/viewtopic.php?f=6&t=1010
 
@@ -84,55 +84,25 @@ function Main (name)
 end
 
 function VH_OnTimer (msec)
-	if os.difftime (os.time (), sets.tick) >= conf.time then
-		for nick, data in pairs (sets.user) do
-			if os.difftime (os.time (), data [""]) >= conf.free * 60 then
-				sets.user [nick] = nil
-			end
-		end
-
-		--[[
-
-		local ok, list = VH:GetNickList ()
-
-		if ok and list and # list >= 11 then
-			local data = sets.find [sets.next]
-			list = list:sub (11)
-
-			for nick in list:gmatch ("[^%$ ]+") do
-				if # nick > 0 then
-					local ok, class = VH:GetUserClass (nick)
-
-					if ok and class and class >= 0 and class < conf.skip then
-						local ok, info = VH:GetMyINFO (nick)
-
-						if ok and info and # info > 0 then
-							local ok, _, shar = info:find ("^%$MyINFO %$ALL [^ ]+ .-$.-%$.-%$.-%$(%d+)%$$")
-
-							if ok and shar and tonumber (shar) > 0 then
-								VH:SendToUser ("$Search Hub:" .. sets.from .. " F?F?0?1?" .. data .. "|", nick)
-							end
-						end
-					end
-				end
-			end
-		else
-			VH:SendToClass ("$Search Hub:" .. sets.from .. " F?F?0?1?" .. sets.find [sets.next] .. "|", 0, conf.skip - 1)
-		end
-
-		]]--
-
-		VH:SendToClass ("$Search Hub:" .. sets.from .. " F?F?0?1?" .. sets.find [sets.next] .. "|", 0, conf.skip - 1)
-
-		if sets.next == # sets.find then
-			sets.next = 1
-		else
-			sets.next = sets.next + 1
-		end
-
-		sets.tick = os.time ()
+	if os.difftime (os.time (), sets.tick) < conf.time then
+		return 1
 	end
 
+	for nick, data in pairs (sets.user) do
+		if os.difftime (os.time (), data [""]) >= conf.free * 60 then
+			sets.user [nick] = nil
+		end
+	end
+
+	VH:SendToClass ("$Search Hub:" .. sets.from .. " F?F?0?1?" .. sets.find [sets.next] .. "|", 0, conf.skip - 1)
+
+	if sets.next == # sets.find then
+		sets.next = 1
+	else
+		sets.next = sets.next + 1
+	end
+
+	sets.tick = os.time ()
 	return 1
 end
 
@@ -145,160 +115,169 @@ function VH_OnParsedMsgSR (nick, data)
 
 	local ok, _, path, name, size = data:find ("^%$SR [^ ]+ (.-)([^\\]-)" .. string.char (5) .. "(%d+) .+")
 
-	if ok and path and name and size and # path > 0 and # name > 0 and tonumber (size) > 0 then
-		for _, file in pairs (conf.file) do
-			for _, ext in pairs (conf.exts) do
-				if getname (name, file) and name:sub (-# ext):lower () == ext then
-					if ext ~= ".rar" or (ext == ".rar" and not name:lower ():find ("%.part%d+%.rar$")) then
-						if sets.user [nick] then
-							if sets.user [nick][path] then
-								if not sets.user [nick][path][name] then
-									if math.abs (sets.user [nick][path][""] - tonumber (size)) <= conf.diff then
-										sets.user [nick][path][name] = tonumber (size)
+	if not ok or not path or not name or not size or # path == 0 or # name == 0 or tonumber (size) == 0 then
+		return 1
+	end
 
-										if getitem (sets.user [nick][path]) >= conf.find then
-											if conf.verb == 2 then
-												local feed, list = "", ""
+	local ok = false
+	local lame = name:lower ()
 
-												for fame, fize in pairs (sets.user [nick][path]) do
-													if # fame > 0 then
-														list = list .. " " .. path .. fame .. " | " .. getsize (fize) .. "\r\n"
-													end
-												end
-
-												list = list:gsub ("%$", "&#36;")
-												list = list:gsub ("|", "&#124;")
-
-												feed = "Infected user detected:\r\n\r\n"
-												feed = feed .. " Nick: " .. nick .. "\r\n"
-												feed = feed .. " IP: " .. getaddr (nick) .. "\r\n"
-												feed = feed .. " Found files:\r\n\r\n"
-												feed = feed .. list
-
-												VH:SendPMToAll (feed, sets.feed, conf.feed, 10)
-											elseif conf.verb == 1 then
-												VH:SendPMToAll ("Infected user detected with IP " .. getaddr (nick) .. ": " .. nick, sets.feed, conf.feed, 10)
-											end
-
-											VH:KickUser (sets.from, nick, conf.kick)
-											sets.user [nick] = nil
-											return 0
-										end
-									end
-								end
-
-								sets.user [nick][path][""] = tonumber (size)
-							else
-								sets.user [nick][path] = {
-									[""] = tonumber (size),
-									[name] = tonumber (size)
-								}
-							end
-						else
-							sets.user [nick] = {
-								[""] = os.time (),
-								[path] = {
-									[""] = tonumber (size),
-									[name] = tonumber (size)
-								}
-							}
-						end
-					end
-
-					return 1
-				end
+	for _, ext in pairs (conf.exts) do
+		if lame:sub (-# ext) == ext then
+			if ext == ".rar" and lame:find ("%.part%d+%.rar$") then
+				return 1
+			else
+				ok = true
+				break
 			end
 		end
 	end
 
-	return 1
-end
+	if not ok then
+		return 1
+	end
 
-function getname (name, file)
-	local lame = name:lower ()
+	local ok = false
 
-	for part in file:gmatch ("[^ ]+") do
-		part = part:gsub ("%%", "%%%%")
-		part = part:gsub ("%^", "%%^")
-		part = part:gsub ("%$", "%%$")
-		part = part:gsub ("%(", "%%(")
-		part = part:gsub ("%)", "%%)")
-		part = part:gsub ("%.", "%%.")
-		part = part:gsub ("%[", "%%[")
-		part = part:gsub ("%]", "%%]")
-		part = part:gsub ("%*", "%%*")
-		part = part:gsub ("%+", "%%+")
-		part = part:gsub ("%-", "%%-")
-		part = part:gsub ("%?", "%%?")
+	for _, file in pairs (conf.file) do
+		local pos = true
 
-		if not lame:find (part) then
-			return false
+		for part in file:gmatch ("[^ ]+") do
+			part = part:gsub ("%%", "%%%%")
+			part = part:gsub ("%^", "%%^")
+			part = part:gsub ("%$", "%%$")
+			part = part:gsub ("%(", "%%(")
+			part = part:gsub ("%)", "%%)")
+			part = part:gsub ("%.", "%%.")
+			part = part:gsub ("%[", "%%[")
+			part = part:gsub ("%]", "%%]")
+			part = part:gsub ("%*", "%%*")
+			part = part:gsub ("%+", "%%+")
+			part = part:gsub ("%-", "%%-")
+			part = part:gsub ("%?", "%%?")
+
+			if not lame:find (part) then
+				pos = false
+				break
+			end
+		end
+
+		if pos then
+			ok = true
+			break
 		end
 	end
 
-	return true
-end
-
-function getitem (list)
-	local back = 0
-
-	for _, _ in pairs (list) do
-		back = back + 1
+	if not ok then
+		return 1
 	end
 
-	return back
-end
+	size = tonumber (size)
 
-function getaddr (nick)
-	local back = "0.0.0.0"
+	if not sets.user [nick] then
+		sets.user [nick] = {
+			[""] = os.time (),
+			[path] = {
+				[""] = size,
+				[name] = size
+			}
+		}
+
+		return 1
+	end
+
+	if not sets.user [nick][path] then
+		sets.user [nick][path] = {
+			[""] = size,
+			[name] = size
+		}
+
+		return 1
+	end
+
+	sets.user [nick][path][""] = size
+
+	if sets.user [nick][path][name] then
+		return 1
+	end
+
+	if math.abs (sets.user [nick][path][""] - size) > conf.diff then
+		return 1
+	end
+
+	sets.user [nick][path][name] = size
+	local num = 0
+
+	for _, _ in pairs (sets.user [nick][path]) do
+		num = num + 1
+
+		if num >= conf.find then
+			break
+		end
+	end
+
+	if num < conf.find then
+		return 1
+	end
+
+	if conf.verb == 0 then
+		VH:KickUser (sets.from, nick, conf.kick)
+		sets.user [nick] = nil
+		return 0
+	end
+
+	local ip = "0.0.0.0"
 	local ok, addr = VH:GetUserIP (nick)
 
 	if ok and addr then
-		back = addr
+		ip = addr
 	end
 
 	local ok, code = VH:GetUserCC (nick)
 
 	if ok and code and code ~= "--" then
-		back = back .. "." .. code
+		ip = ip .. "." .. code
 	end
 
-	return back
-end
+	local feed = ""
 
-function getsize (size)
-	local back = {
-		["size"] = size,
-		["pref"] = "B"
-	}
+	if conf.verb >= 2 then
+		local list = ""
 
-	if size >= 1208925819614629174706176 then
-		back.size = size / 1208925819614629174706176
-		back.pref = "YB"
-	elseif size >= 1180591620717411303424 then
-		back.size = size / 1180591620717411303424
-		back.pref = "ZB"
-	elseif size >= 1152921504606846976 then
-		back.size = size / 1152921504606846976
-		back.pref = "EB"
-	elseif size >= 1125899906842624 then
-		back.size = size / 1125899906842624
-		back.pref = "PB"
-	elseif size >= 1099511627776 then
-		back.size = size / 1099511627776
-		back.pref = "TB"
-	elseif size >= 1073741824 then
-		back.size = size / 1073741824
-		back.pref = "GB"
-	elseif size >= 1048576 then
-		back.size = size / 1048576
-		back.pref = "MB"
-	elseif size >= 1024 then
-		back.size = size / 1024
-		back.pref = "KB"
+		for fame, fize in pairs (sets.user [nick][path]) do
+			if # fame > 0 then
+				local pref = "B"
+
+				if fize >= 1073741824 then
+					fize = fize / 1073741824
+					pref = "GB"
+				elseif fize >= 1048576 then
+					fize = fize / 1048576
+					pref = "MB"
+				elseif fize >= 1024 then
+					fize = fize / 1024
+					pref = "KB"
+				end
+
+				list = list .. " " .. path .. fame .. " | " .. string.format ("%.2f", fize) .. " " .. pref .. "\r\n"
+			end
+		end
+
+		list = list:gsub ("%$", "&#36;")
+		list = list:gsub ("|", "&#124;")
+		feed = "Infected user detected:\r\n\r\n"
+		feed = feed .. " Nick: " .. nick .. "\r\n"
+		feed = feed .. " IP: " .. ip .. "\r\n"
+		feed = feed .. " Found files:\r\n\r\n"
+		feed = feed .. list
+	else
+		feed = "Infected user detected with IP " .. ip .. ": " .. nick
 	end
 
-	return string.format ("%.2f", back.size) .. " " .. back.pref
+	VH:SendPMToAll (feed, sets.feed, conf.feed, 10)
+	VH:KickUser (sets.from, nick, conf.kick)
+	sets.user [nick] = nil
+	return 0
 end
 
 -- end of file
