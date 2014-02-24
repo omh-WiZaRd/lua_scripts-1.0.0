@@ -195,16 +195,17 @@ function VH_OnParsedMsgSR (nick, data)
 		return 1
 	end
 
-	sets.user [nick][path][""] = size
-
 	if sets.user [nick][path][name] then
+		sets.user [nick][path][""] = size
 		return 1
 	end
 
 	if math.abs (sets.user [nick][path][""] - size) > conf.diff then
+		sets.user [nick][path][""] = size
 		return 1
 	end
 
+	sets.user [nick][path][""] = size
 	sets.user [nick][path][name] = size
 	local num = 0
 
